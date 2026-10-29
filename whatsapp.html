@@ -1,0 +1,1165 @@
+<!doctype html>
+<html lang="es-PE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0B3322">
+<title>Simulador de WhatsApp | Green House Realty</title>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   Simulador de WhatsApp: demo de Green House Realty (asistente virtual).
+   Autocontenido: HTML + CSS + JS vanilla. Sin frameworks ni CDN de scripts.
+
+   Perspectiva: esta pantalla es el TELEFONO DEL CLIENTE POTENCIAL conversando con Green House Realty.
+     dir:'in'  = el contacto escribe             -> burbuja VERDE a la derecha
+     dir:'out' = el asistente (IA) responde     -> burbuja BLANCA a la izquierda
+     dir:'pase'= tarjeta "Alerta para el equipo" (aviso del sistema, no es un mensaje)
+   Los mensajes `auto:true` son locales: el "Saludo automatico" de Meta no lo
+   escribe el agente, lo manda WhatsApp Business al primer mensaje.
+
+   Backend (mismo contrato que las demas demos de chat sin RAG):
+     POST {BASE}/greenhouserealty-demo-agent
+       { message, sessionId, channel:'web', origin }  ->  { output }
+   Sesion nueva por escenario: greenhousedemo_<rand>. Jamas prefijos wa_/ig_/msg_/fb_.
+
+   Pruebas sin gastar IA:  ?mock=1  responde con un guion local (sin llamar al chat).
+   ========================================================================== */
+:root{
+  --v:#2F6B3A; --v2:#16603B; --vd:#0B3322; --vd2:#0F3D29; --vd3:#134A32;
+  --oro:#D9B23A; --oro-hi:#EBCB62; --oro-lo:#8DBA4F;
+  --menta:#E6F2EA; --fondo:#F4F9F5; --mute:#A9C9B6; --mute-2:#7FA48C;
+  --line:rgba(217,178,58,.34); --line-soft:rgba(244,249,245,.14);
+  --wa-header:#075e54; --wa-fondo:#dbe8d6; --wa-out:#d9fdd3; --wa-in:#ffffff;
+  --wa-meta:#667781; --wa-tick:#53bdeb; --wa-ink:#111b21;
+  --caliente:#E5532D; --tibia:#E0A526; --fria:#7C9A87;
+  --head:'Montserrat',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --sans:'Open Sans',system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;color-scheme:dark}
+body{margin:0;background:var(--vd);color:var(--fondo);font-family:var(--sans);font-size:16px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;min-height:100dvh;display:flex;flex-direction:column}
+img{max-width:100%;height:auto;display:block}
+p,h1,h2,h3,h4,ol,ul{margin:0}
+ol,ul{padding:0;list-style:none}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+[hidden]{display:none !important}
+a{color:var(--oro-hi)}
+:focus-visible{outline:3px solid var(--oro-hi);outline-offset:2px;border-radius:8px}
+
+/* ---------- franja de demo ---------- */
+.aviso{background:#06180F;color:var(--mute);padding:7px 16px;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;text-align:center;border-bottom:1px solid var(--line-soft)}
+.aviso b{color:var(--oro);font-weight:800}
+.aviso .corto{display:none}
+
+/* ---------- barra superior ---------- */
+.top{background:var(--vd);border-bottom:1px solid var(--line-soft);flex:none}
+.top-in{max-width:1180px;margin:0 auto;padding:8px 16px;display:flex;align-items:center;gap:12px}
+.top-in .logo{width:44px;height:44px;border-radius:50%;flex:none}
+.top-in .quien{min-width:0}
+.top-in .quien b{display:block;font-family:var(--head);font-weight:800;font-size:14px;letter-spacing:.12em;color:var(--oro);line-height:1.2}
+.top-in .quien small{display:block;font-size:12.5px;color:var(--mute);font-weight:500}
+.top-sp{flex:1}
+.lnk{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 16px;border-radius:999px;border:1.5px solid var(--line);
+  background:transparent;color:var(--fondo);font-weight:700;font-size:14px;text-decoration:none;white-space:nowrap;cursor:pointer}
+.lnk:hover{border-color:var(--oro);color:var(--oro-hi)}
+.lnk.solid{background:var(--oro);color:var(--vd);border-color:transparent}
+.lnk.solid:hover{background:var(--oro-hi);color:var(--vd)}
+.lnk.volver{border-color:transparent;color:var(--mute);padding:0 10px}
+.lnk.volver:hover{color:var(--oro-hi)}
+
+/* ---------- selector de escenario ---------- */
+.selector{background:var(--vd2);border-bottom:1px solid var(--line-soft);flex:none}
+.sel-in{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap}
+.sel-lab{font-weight:800;font-size:14px;color:var(--mute);letter-spacing:.02em}
+.chips{display:flex;gap:8px;flex-wrap:wrap;min-width:0}
+.chip{border:1.5px solid var(--oro);background:transparent;cursor:pointer;min-height:44px;padding:0 12px 0 8px;border-radius:999px;font-weight:700;font-size:13.5px;line-height:1.15;color:var(--oro-hi);text-align:center;display:inline-flex;align-items:center;gap:8px}
+.chip .l{width:22px;height:22px;border-radius:50%;background:var(--oro);color:var(--vd);font-family:var(--head);font-weight:800;font-size:12px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.chip[aria-pressed="true"]{background:var(--oro);color:var(--vd)}
+.chip[aria-pressed="true"] .l{background:var(--vd);color:var(--oro)}
+.chip:not([aria-pressed="true"]):hover{background:rgba(217,178,58,.14)}
+.sel-info{font-size:13.5px;font-weight:500;color:var(--mute);min-width:0;flex:1 1 100%}
+
+/* ---------- layout ---------- */
+.wrap{flex:1;width:100%;max-width:1180px;margin:0 auto;padding:18px 16px;display:grid;grid-template-columns:minmax(0,1fr);gap:22px;align-content:start;min-height:0}
+@media (min-width:900px){
+  .wrap{grid-template-columns:360px minmax(0,1fr);align-items:start}
+  .lateral{position:sticky;top:16px}
+}
+
+/* ---------- panel lateral (escritorio) ---------- */
+.lateral{background:var(--vd2);border:1px solid var(--line-soft);border-radius:18px;padding:20px 20px 22px}
+.lateral h2{font-family:var(--head);font-weight:800;font-size:1.45rem;letter-spacing:-.01em;line-height:1.15}
+.lateral .sub{margin-top:8px;font-size:14.5px;color:var(--mute);line-height:1.55}
+.grp{margin-top:18px;padding-top:16px;border-top:1px solid var(--line-soft)}
+.grp h3{font-family:var(--head);font-weight:700;font-size:14.5px;color:var(--fondo)}
+.grp .hint{margin-top:8px;font-size:13px;color:var(--mute-2);line-height:1.45}
+.rapidos{margin-top:10px;display:flex;flex-direction:column;gap:7px}
+.rapido{padding:10px 13px;border-radius:12px;border:1px solid var(--line-soft);background:var(--vd3);font-size:14.5px;font-weight:600;color:var(--fondo);cursor:pointer;text-align:left;line-height:1.35;min-height:44px}
+.rapido:hover{border-color:var(--oro);color:var(--oro-hi)}
+.fld{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+.fld input{flex:1 1 150px;padding:10px 12px;border:1px solid var(--line-soft);border-radius:12px;background:var(--vd);color:var(--fondo);font-size:13px;-webkit-appearance:none;appearance:none;min-height:44px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.btn-s{min-height:44px;padding:0 20px;border:1.5px solid var(--oro);border-radius:999px;background:transparent;color:var(--oro-hi);font-weight:800;font-size:14.5px;cursor:pointer;line-height:1}
+.btn-s:hover{background:var(--oro);color:var(--vd)}
+.reparto{margin:12px 0 0;display:grid;gap:11px}
+.reparto li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;align-items:start;font-size:14.5px;line-height:1.4}
+.reparto .n{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--oro);color:var(--oro-hi);font-family:var(--head);font-weight:800;font-size:.9rem;display:flex;align-items:center;justify-content:center;line-height:1}
+.reparto li.ed .n{background:var(--oro);color:var(--vd)}
+.reparto b{font-weight:700}
+.estado-pase{margin-top:12px;border:1px dashed var(--line);border-radius:14px;padding:11px 14px;font-size:14px;color:var(--mute);line-height:1.45}
+.estado-pase b{display:block;color:var(--fondo);font-weight:700;margin-bottom:2px}
+.estado-pase.hecho{border:1px solid var(--oro);background:rgba(217,178,58,.08);color:var(--fondo)}
+.estado-pase.hecho b{color:var(--oro-hi)}
+.turnos{margin-top:12px;font-size:13px;color:var(--mute);display:flex;justify-content:space-between;gap:8px}
+.turnos b{color:var(--fondo)}
+.lat-links{margin-top:16px;display:flex;flex-direction:column;gap:6px;font-size:14.5px;font-weight:700}
+.lat-links a{text-decoration:none}
+
+/* ---------- telefono ---------- */
+.fono{background:#031a13;border-radius:28px;padding:9px;border:1px solid var(--line-soft);box-shadow:0 30px 70px -30px rgba(0,0,0,.95),0 0 0 1px rgba(217,178,58,.07);
+  display:flex;flex-direction:column;overflow:hidden;height:min(790px,calc(100dvh - 300px));min-height:560px;max-width:430px;width:100%;margin:0 auto}
+.pantalla{flex:1;display:flex;flex-direction:column;background:var(--wa-fondo);border-radius:20px;overflow:hidden;min-height:0;color:var(--wa-ink)}
+.status{background:var(--wa-header);color:#fff;display:flex;align-items:center;gap:8px;padding:7px 16px 5px;font-size:12px;font-weight:700}
+.status .sp{flex:1}
+.chat-hd{background:var(--wa-header);color:#fff;display:flex;align-items:center;gap:11px;padding:8px 12px 10px}
+.chat-hd .back{opacity:.9;flex:none}
+.chat-hd .av{width:42px;height:42px;border-radius:50%;flex:none;background:#2F6B3A}
+.chat-hd .quien{flex:1;min-width:0}
+.chat-hd .quien b{display:flex;align-items:center;gap:6px;font-size:15.5px;font-weight:700;line-height:1.2;white-space:nowrap}
+.chat-hd .quien small{display:block;font-size:12.5px;color:rgba(255,255,255,.84);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-hd .ico{display:flex;gap:16px;opacity:.92;flex:none;padding-right:2px}
+
+.hilo{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:12px 8px 14px;min-height:0;background-color:var(--wa-fondo);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Cg fill='none' stroke='%23c4d6bf' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round' opacity='.75'%3E%3Cpath d='M16 24h14M23 17v14'/%3E%3Ccircle cx='108' cy='30' r='8'/%3E%3Cpath d='M34 70c7-9 16-9 23 0'/%3E%3Cpath d='M86 86l9 9 16-18'/%3E%3Cpath d='M20 108h18v11H29l-5 6v-6h-4z'/%3E%3Cpath d='M118 116h11M123.5 110.5v11'/%3E%3Cpath d='M62 118h16'/%3E%3Cpath d='M70 40v12'/%3E%3C/g%3E%3C/svg%3E")}
+.demo-nota{display:block;max-width:92%;margin:2px auto 10px;background:#fff8c9;color:#54656f;border-radius:8px;padding:8px 11px;font-size:12.5px;line-height:1.45;text-align:center;font-weight:600;box-shadow:0 1px 1px rgba(11,20,26,.13)}
+.demo-nota.mockn{background:#fde7d6;color:#7a3a0b}
+.dia{display:block;width:fit-content;margin:8px auto 8px;background:#fff;color:var(--wa-meta);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;box-shadow:0 1px 1px rgba(11,20,26,.13)}
+.reloj{display:flex;align-items:center;gap:7px;width:fit-content;margin:0 auto 12px;background:#1f2c34;color:#e9edef;border-radius:999px;padding:6px 14px 6px 10px;font-size:13px;font-weight:700;box-shadow:0 1px 2px rgba(11,20,26,.25)}
+.reloj small{font-weight:600;color:#aebac1;font-size:11.5px}
+.ej{display:block;width:fit-content;max-width:88%;margin:0 auto 8px;background:#e7e2db;color:#54656f;border-radius:8px;padding:5px 10px;font-size:12px;line-height:1.4;text-align:center;font-weight:600}
+.sis{display:block;width:fit-content;max-width:90%;margin:8px auto 10px;background:#e7e2db;color:#3b4a54;border-radius:8px;padding:8px 12px;font-size:13px;line-height:1.45;text-align:center;box-shadow:0 1px 1px rgba(11,20,26,.1)}
+.sis.err{background:#fdecea;color:#7a1d17}
+.sis button{display:block;margin:8px auto 0;min-height:44px;padding:0 20px;border-radius:999px;border:2px solid #7a1d17;background:#fff;color:#7a1d17;font-weight:800;font-size:14px;cursor:pointer}
+.sis button:hover{background:#7a1d17;color:#fff}
+
+.msg{width:fit-content;max-width:84%;margin:0 6px 8px;padding:6px 9px 7px;border-radius:8px;position:relative;box-shadow:0 1px 1px rgba(11,20,26,.13);
+  font-size:15.5px;line-height:1.42;color:var(--wa-ink);overflow-wrap:anywhere}
+.msg.nuevo{animation:aparece .18s ease-out}
+@keyframes aparece{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.msg.del-neg{background:var(--wa-in);margin-right:auto;border-top-left-radius:0}
+.msg.del-cliente{background:var(--wa-out);margin-left:auto;border-top-right-radius:0}
+.msg .ln{display:block;white-space:pre-wrap}
+.msg .ln.sep{height:.85em}
+.msg .ln.li{padding-left:1.15em;text-indent:-1.15em}
+.msg .txt a{color:#027eb5;text-decoration:underline;overflow-wrap:anywhere}
+.msg strong{font-weight:700}
+.msg .pie{float:right;margin:6px 0 -2px 10px;display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--wa-meta);line-height:1;user-select:none;white-space:nowrap}
+.msg .pie .ticks{color:var(--wa-tick)}
+.msg .pie .ticks.gris{color:#8696a0}
+.msg::after{content:"";display:block;clear:both}
+.msg.del-neg::before,.msg.del-cliente::before{content:"";position:absolute;top:0;width:9px;height:13px}
+.msg.del-neg::before{left:-8px;background:var(--wa-in);clip-path:polygon(100% 0,0 0,100% 100%)}
+.msg.del-cliente::before{right:-8px;background:var(--wa-out);clip-path:polygon(0 0,100% 0,0 100%)}
+/* CSS defensivo: emojis convertidos en <img> por librerias no pueden crecer */
+.msg img.emoji,.msg .txt img{max-width:1.2em !important;max-height:1.2em !important;display:inline-block !important;vertical-align:text-bottom !important}
+
+/* saludo automatico de Meta + vista del anuncio */
+.msg.meta{padding:4px 4px 7px}
+.msg.meta .txt{display:block;padding:4px 6px 0}
+.msg.meta .pie{margin-right:4px}
+.ad{display:block;border-radius:6px;overflow:hidden;background:#2F6B3A;color:#fff;margin:0 0 5px;border:1px solid rgba(11,20,26,.12)}
+.ad img{width:100%;height:auto;aspect-ratio:520/512;object-fit:cover;background:#F4F9F5}
+.ad .ad-t{display:block;padding:7px 10px 8px;font-size:12px;line-height:1.35}
+.ad .ad-t b{display:block;font-size:13.5px;font-weight:800}
+.ad .ad-t span{color:rgba(255,255,255,.78)}
+.ad.css{background:linear-gradient(135deg,#2F6B3A,#16603B 62%,#1b6b45);padding:12px 12px 12px;border:0}
+.ad.css .big{display:block;font-family:var(--head);font-weight:800;font-size:19px;line-height:1.1;letter-spacing:-.01em;color:#fff}
+.ad.css .big i{font-style:normal;color:var(--oro)}
+.ad.css .rule{display:block;height:4px;border-radius:2px;background:var(--oro);width:54px;margin:8px 0 8px}
+.ad.css .ad-t{padding:0;color:rgba(255,255,255,.86)}
+.tag-auto{display:block;margin:4px 6px 0;font-size:11.5px;color:var(--wa-meta);font-style:italic}
+
+.typing{display:flex;gap:4px;align-items:center;width:fit-content;margin:0 6px 8px;padding:11px 13px;background:var(--wa-in);border-radius:8px;border-top-left-radius:0;box-shadow:0 1px 1px rgba(11,20,26,.13)}
+.typing i{width:7px;height:7px;border-radius:50%;background:#9aa6ab;animation:pulso 1.1s infinite}
+.typing i:nth-child(2){animation-delay:.16s}.typing i:nth-child(3){animation-delay:.32s}
+@keyframes pulso{0%,60%,100%{opacity:.35;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+
+/* tarjeta: alerta para el equipo */
+.pase{margin:10px 8px 14px;background:#0B3322;color:var(--fondo);border:1.5px solid var(--oro);border-radius:16px;padding:14px 15px 13px;box-shadow:0 8px 24px -10px rgba(0,0,0,.6)}
+.pase.nuevo{animation:aparece .25s ease-out}
+.pase .kick{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--oro)}
+.pase .kick .pulso{width:9px;height:9px;border-radius:50%;background:var(--caliente);box-shadow:0 0 0 0 rgba(229,83,45,.6);animation:alerta 1.6s infinite}
+@keyframes alerta{0%{box-shadow:0 0 0 0 rgba(229,83,45,.55)}70%{box-shadow:0 0 0 9px rgba(229,83,45,0)}100%{box-shadow:0 0 0 0 rgba(229,83,45,0)}}
+.pase .cab{display:flex;align-items:center;gap:10px;margin-top:7px}
+.pase .ok{width:26px;height:26px;border-radius:50%;background:var(--oro);color:#0B3322;display:flex;align-items:center;justify-content:center;flex:none}
+.pase h4{margin:0;font-family:var(--head);font-weight:800;font-size:1.08rem;line-height:1.15;flex:1;color:#fff}
+.pase .cal{font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;color:#0B3322;white-space:nowrap}
+.pase .cal.caliente{background:var(--caliente);color:#fff}
+.pase .cal.tibia{background:var(--tibia)}
+.pase .cal.fria{background:var(--fria);color:#0B3322}
+.pase .cal.nd{background:transparent;border:1px solid var(--line);color:var(--mute);letter-spacing:.02em;text-transform:none;font-weight:700}
+.pase .res{margin-top:10px;font-size:12.5px;font-weight:700;color:var(--mute)}
+.pase dl{margin:6px 0 0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:5px 12px;font-size:14px;line-height:1.4}
+.pase dt{color:var(--mute);font-weight:600}
+.pase dd{margin:0;font-weight:700;overflow-wrap:anywhere}
+.pase .vacio{margin-top:8px;font-size:13.5px;color:var(--mute);line-height:1.45}
+.pase .tomar{margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pase .tomar button{min-height:44px;padding:0 18px;border-radius:999px;border:0;background:var(--oro);color:#0B3322;font-weight:800;font-size:14px;cursor:pointer}
+.pase .tomar button:hover{background:var(--oro-hi)}
+.pase .tomar span{font-size:12.5px;color:var(--mute);line-height:1.35;flex:1 1 140px}
+.pase .tomado{margin-top:12px;padding:9px 12px;border-radius:12px;background:rgba(217,178,58,.12);border:1px solid var(--line);font-size:13.5px;font-weight:700;color:var(--oro-hi);line-height:1.4}
+.pase .crm{display:inline-flex;align-items:center;min-height:44px;margin-top:10px;font-size:13.5px;font-weight:700;color:var(--oro-hi);text-decoration:underline;text-underline-offset:3px}
+.pase .nota{margin-top:6px;padding-top:9px;border-top:1px solid var(--line-soft);font-size:12px;color:var(--mute-2);line-height:1.4}
+
+.rapidos-m{display:none;gap:7px;padding:8px 8px 0;background:#f0f2f5;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.rapidos-m::-webkit-scrollbar{display:none}
+.rapidos-m .rapido{white-space:nowrap;padding:8px 14px;border-radius:999px;font-size:14px;flex:none;background:#fff;color:var(--wa-ink);border:1.5px solid #d6dbdf;min-height:44px}
+.rapidos-m .rapido:hover{border-color:#2F6B3A;color:var(--wa-ink)}
+
+.escribir{display:flex;align-items:flex-end;gap:7px;padding:7px 8px 9px;background:#f0f2f5}
+.caja-txt{flex:1;display:flex;align-items:flex-end;gap:8px;background:#fff;border-radius:22px;padding:10px 13px;min-width:0}
+.caja-txt svg{flex:none;color:#8696a0;margin-bottom:2px}
+.caja-txt textarea{flex:1;border:0;outline:0;resize:none;overflow:hidden;max-height:100px;font-size:16px;line-height:1.4;background:transparent;color:var(--wa-ink);padding:0;min-width:0}
+.caja-txt textarea::placeholder{color:#6b7a84}
+.enviar{flex:none;width:46px;height:46px;border-radius:50%;border:0;background:#2F6B3A;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.enviar:hover{background:#1b6b45}
+.enviar:disabled{opacity:.5;cursor:progress}
+
+footer{border-top:1px solid var(--line-soft);background:#06180F;flex:none}
+.foot{max-width:1180px;margin:0 auto;padding:12px 16px;display:flex;gap:6px 18px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--mute-2)}
+.foot a{color:var(--mute);text-decoration:none;font-weight:700}
+.foot a:hover{color:var(--oro-hi);text-decoration:underline}
+.foot .sp{flex:1}
+
+/* ---------- movil: la pantalla es la app ---------- */
+@media (max-width:899px){
+  body{height:100dvh;overflow:hidden}
+  .aviso{padding:5px 10px;font-size:10px;letter-spacing:.05em}
+  .aviso .largo{display:none}
+  .aviso .corto{display:inline}
+  .top-in{padding:4px 12px;gap:6px}
+  .top-in .logo{display:none}
+  .top-in .quien{display:block}
+  .top-in .quien small{display:none}
+  .top-in .quien b{font-size:12px;letter-spacing:.08em}
+  .lnk{min-height:44px;padding:0 12px;font-size:13px}
+  .lnk.volver{display:none}
+  .sel-in{padding:6px 12px;gap:6px;flex-wrap:nowrap}
+  .sel-lab{display:none}
+  .chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:0 -12px;padding:0 12px;flex:1}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{white-space:nowrap;flex:none;padding:0 13px;font-size:13px}
+  .sel-info{display:none}
+  .wrap{padding:0;display:block;min-height:0;overflow:hidden}
+  .lateral{display:none}
+  .fono{height:100%;max-width:none;border-radius:0;padding:0;box-shadow:none;border:0;background:transparent;min-height:0}
+  .pantalla{border-radius:0}
+  .status{display:none}
+  .rapidos-m{display:flex}
+  .msg{max-width:88%}
+  .foot{padding:6px 12px;font-size:11px;justify-content:space-between;flex-wrap:nowrap}
+  .foot .sp,.foot .largo{display:none}
+}
+@media (min-width:900px){ .foot .corto{display:none} }
+@media (prefers-reduced-motion:reduce){ *{animation:none !important} }
+</style>
+</head>
+<body>
+
+<div class="aviso"><b>Demo</b> <span class="largo">&middot; simulaci&oacute;n: no escribas DNI ni datos reales &middot; no es el WhatsApp real y no se env&iacute;a nada a nadie &middot; hecha por IJV Agency</span><span class="corto">&middot; simulaci&oacute;n, no es el WhatsApp real</span></div>
+
+<header class="top">
+  <div class="top-in">
+    <img class="logo" src="assets/logo.jpg" width="44" height="44" alt="" onerror="this.style.display='none'">
+    <div class="quien"><b>SIMULADOR DE WHATSAPP</b><small>Demo del asistente de Green House Realty</small></div>
+    <div class="top-sp"></div>
+    <a class="lnk volver" href="./">&larr; Volver al sitio</a>
+    <a class="lnk" href="panel.html">Ver el CRM</a>
+    <button class="lnk solid" id="btn-reiniciar-top" type="button">Reiniciar chat</button>
+  </div>
+</header>
+
+<div class="selector">
+  <div class="sel-in">
+    <span class="sel-lab">Simular:</span>
+    <div class="chips" role="group" aria-label="Escenario">
+      <button class="chip" type="button" data-esc="anuncio" aria-pressed="false"><span class="l">A</span>Vi el aviso del depa en San Miguel</button>
+      <button class="chip" type="button" data-esc="distritos" aria-pressed="false"><span class="l">B</span>Busco en Pueblo Libre</button>
+      <button class="chip" type="button" data-esc="requisitos" aria-pressed="false"><span class="l">C</span>&iquest;Qu&eacute; requisitos piden?</button>
+      <button class="chip" type="button" data-esc="comprar" aria-pressed="false"><span class="l">D</span>Quiero comprar una casa</button>
+      <button class="chip" type="button" data-esc="colega" aria-pressed="false"><span class="l">E</span>Soy colega o propietario</button>
+      <button class="chip" type="button" data-esc="curioso" aria-pressed="false"><span class="l">F</span>Solo miro precios</button>
+    </div>
+    <p class="sel-info" id="sel-info"></p>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ============ panel lateral (escritorio) ============ -->
+  <aside class="lateral">
+    <h2>As&iacute; lo ve quien escribe a Green House</h2>
+    <p class="sub">Elige un escenario: el bot&oacute;n escribe el primer mensaje por ti, como lo har&iacute;a alguien que lleg&oacute; por un aviso tuyo. Despu&eacute;s sigue la conversaci&oacute;n t&uacute; mismo.</p>
+
+    <div class="grp">
+      <h3>Qu&eacute; hace cada quien</h3>
+      <ol class="reparto">
+        <li><span class="n">1</span><span><b>Asistente (IA):</b> responde al instante, a cualquier hora, con lo que ya publicas. Un dato por mensaje, sin repetir lo que ya le dijiste.</span></li>
+        <li><span class="n">2</span><span><b>Asistente (IA):</b> filtra (operaci&oacute;n, zona, presupuesto, personas, mascotas), ofrece distritos cercanos, califica Caliente / Tibio / Fr&iacute;o y propone la visita.</span></li>
+        <li class="ed"><span class="n">3</span><span><b>Asesora:</b> recibe la alerta &laquo;visita por confirmar&raquo; con la calificaci&oacute;n y atiende al cliente en el inmueble. Cierre y contrato los lleva ella.</span></li>
+      </ol>
+      <div class="estado-pase" id="estado-pase"><b>Alerta al equipo: pendiente</b>Todav&iacute;a no hay ninguna visita lista para la asesora.</div>
+      <div class="turnos"><span>Turnos de esta conversaci&oacute;n</span><b id="turnos">0 de 18</b></div>
+    </div>
+
+    <div class="grp">
+      <h3>Mensajes r&aacute;pidos (datos ficticios)</h3>
+      <div class="rapidos" id="rapidos-d"></div>
+      <p class="hint">Se escriben en la caja de texto; t&uacute; decides cu&aacute;ndo enviarlos.</p>
+    </div>
+
+    <div class="grp">
+      <h3>Conversaci&oacute;n</h3>
+      <div class="fld"><input type="text" id="in-sesion" class="mono" aria-label="Identificador de la conversaci&oacute;n" readonly></div>
+      <div class="fld"><button class="btn-s" id="btn-reiniciar" type="button">Reiniciar chat</button></div>
+      <p class="hint">Empieza un hilo limpio, con el mismo escenario (sin enviar nada).</p>
+    </div>
+
+    <div class="lat-links">
+      <a href="panel.html">Ver c&oacute;mo queda en el CRM &rarr;</a>
+      <a href="./">&larr; Volver al sitio</a>
+    </div>
+  </aside>
+
+  <!-- ============ telefono ============ -->
+  <div class="fono">
+    <div class="pantalla">
+
+      <div class="status">
+        <span id="st-hora">--:--</span>
+        <span class="sp"></span>
+        <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor" aria-hidden="true"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+        <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M1 5.2C3 3.1 5.4 2 8 2s5 1.1 7 3.2"/><path d="M3.6 7.7C4.9 6.4 6.4 5.7 8 5.7s3.1.7 4.4 2"/><path d="M6.3 10.2c.5-.5 1-.8 1.7-.8s1.2.3 1.7.8"/></svg>
+        <svg width="24" height="12" viewBox="0 0 24 12" aria-hidden="true"><rect x=".7" y=".7" width="19" height="10.6" rx="2.6" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".6"/><rect x="2.2" y="2.2" width="14.5" height="7.6" rx="1.5" fill="currentColor"/><path d="M21.4 4.2v3.6c1-.3 1.5-.8 1.5-1.8s-.5-1.5-1.5-1.8z" fill="currentColor" opacity=".6"/></svg>
+      </div>
+
+      <div class="chat-hd">
+        <svg class="back" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+        <img class="av" id="hd-av" src="assets/logo.jpg" width="42" height="42" alt="">
+        <div class="quien">
+          <b>Green House Inmobiliaria <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#25d366"/><path d="M7 12.5l3.2 3.2L17 8.8" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></b>
+          <small id="hd-estado">cuenta de empresa</small>
+        </div>
+        <div class="ico">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.5 2.1L8.1 9.9a16 16 0 006 6l1.3-1.2a2 2 0 012.1-.5c.9.3 1.8.6 2.8.7a2 2 0 011.7 2z"/></svg>
+          <svg width="5" height="19" viewBox="0 0 5 19" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="2.5" r="2.1"/><circle cx="2.5" cy="9.5" r="2.1"/><circle cx="2.5" cy="16.5" r="2.1"/></svg>
+        </div>
+      </div>
+
+      <div class="hilo" id="hilo" role="log" aria-live="polite" aria-label="Conversaci&oacute;n de WhatsApp"></div>
+
+      <div class="rapidos-m" id="rapidos-m"></div>
+
+      <form class="escribir" id="form">
+        <div class="caja-txt">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9.2"/><path d="M8.4 14.2c.9 1.2 2.1 1.8 3.6 1.8s2.7-.6 3.6-1.8" stroke-linecap="round"/><circle cx="9" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1.1" fill="currentColor" stroke="none"/></svg>
+          <textarea id="in-msg" rows="1" placeholder="Mensaje" autocomplete="off" aria-label="Mensaje"></textarea>
+        </div>
+        <button class="enviar" id="btn-enviar" type="submit" aria-label="Enviar mensaje">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2.3 21.3l19.4-8.7c.9-.4.9-1.7 0-2.1L2.3 1.8c-.8-.4-1.6.3-1.4 1.1L3 10.3c.1.4.4.6.8.7l8.5 1-8.5 1c-.4 0-.7.3-.8.7L.9 20.2c-.2.8.6 1.5 1.4 1.1z"/></svg>
+        </button>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="foot">
+    <span><span class="corto">Demo de <b>IJV Agency</b></span><span class="largo">Simulador preparado por <b>IJV Agency</b> para Green House Realty. Sitio de muestra, no es una web oficial. Precio y disponibilidad se confirman con la asesora.</span></span>
+    <span class="sp"></span>
+    <a href="https://ijvagency.com/" target="_blank" rel="noopener">Powered by IJV</a>
+  </div>
+</footer>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ---------------- backend ---------------- */
+  var BASE_DEF = 'https://meta.ijvagency.com/webhook';
+  var qs = new URLSearchParams(location.search);
+  /* ?mock=1 -> guion local, NO llama al chat (para probar el diseno sin gastar IA) */
+  var MOCK = qs.get('mock') === '1';
+  /* El override ?api= solo se acepta sirviendo en local (pruebas contra un stub).
+     En produccion la pagina siempre habla con el webhook real. */
+  var esLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  var BASE = (esLocal && qs.get('api')) ? qs.get('api').replace(/\/$/,'') : BASE_DEF;
+  var EP_CHAT = BASE + '/greenhouserealty-demo-agent';
+
+  var TZ = 'America/Lima';
+  var TIMEOUT = 45000;      /* el agente con catalogo inline puede tardar */
+  var REINTENTOS = 1;       /* un reintento automatico; luego el boton Reintentar: nada de loops */
+  var MAX_TURNOS = 18;      /* el Security del chat corta en 20 por sesion: se frena antes */
+  var K = 'greenhousedemo:v1';  /* sessionStorage: estable por pestana */
+
+  /* ---------------- escenarios ----------------
+     Cada boton SOLO escribe y envia el primer mensaje literal; lo que responde el
+     asistente es del asistente (o del guion local con ?mock=1). */
+  var ESCENARIOS = {
+    anuncio: {
+      primero: 'Hola, vi su aviso del departamento en San Miguel. ¿Sigue disponible?',
+      ad: 'depa',
+      info: 'La persona tocó un aviso de la propiedad V-82 y WhatsApp abrió el chat. El asistente confirma la propiedad y hace una pregunta a la vez para preparar la visita.',
+      nota: 'Demo: simulas a alguien que vio el aviso. Datos ficticios; no escribas DNI ni datos reales.',
+      rapidos: [
+        'Somos 3 y un gatito de 4 años',
+        'Quisiera mudarme este mes',
+        '¿Cuáles son los requisitos?',
+        'El viernes a las 7 de la noche',
+        'Mi nombre es Mariana Salazar Vega',
+        'Es el mismo número de este WhatsApp'
+      ]
+    },
+    distritos: {
+      primero: 'Busco alquilar un departamento en Pueblo Libre',
+      ad: null,
+      info: 'Pide un distrito concreto. El asistente toma la zona y, además, ofrece opciones en distritos cercanos para que la persona compare.',
+      nota: 'Demo: simulas a alguien que busca alquiler en Pueblo Libre. Datos ficticios.',
+      rapidos: [
+        'Mi presupuesto es hasta S/ 2,500',
+        'Somos 2 personas',
+        'Sí, muéstrame alternativas en otros distritos',
+        'No tengo mascotas',
+        'El sábado a las 11 de la mañana',
+        'Mi nombre es Diego Paredes Luna'
+      ]
+    },
+    requisitos: {
+      primero: '¿Qué requisitos piden para alquilar?',
+      ad: null,
+      info: 'Pregunta directa por los requisitos. El asistente responde solo lo publicado (boletas, DNI, antecedentes, Infocorp en verde) y sigue con un dato a la vez.',
+      nota: 'Demo: simulas a alguien que pregunta primero por los requisitos. Datos ficticios.',
+      rapidos: [
+        'Busco en San Miguel',
+        'Mi Infocorp está en verde',
+        'Somos 2 personas',
+        '¿Cuánto es la garantía?',
+        'Mi nombre es Rocío Vásquez Peña',
+        'El lunes a las 4:30 de la tarde'
+      ]
+    },
+    comprar: {
+      primero: 'Quiero comprar una casa, ¿qué tienen?',
+      ad: null,
+      info: 'Quiere comprar. El asistente pregunta zona y presupuesto antes de mostrar opciones, y propone una visita a la propiedad que encaje.',
+      nota: 'Demo: simulas a alguien que quiere comprar. Datos ficticios.',
+      rapidos: [
+        'Prefiero Carabayllo o Comas',
+        'Mi presupuesto es hasta US$ 140,000',
+        'Pagaría con crédito hipotecario',
+        'Quiero visitarla el sábado',
+        'Mi nombre es Luis Cárdenas Rojas',
+        'Mi número es 900 000 031'
+      ]
+    },
+    colega: {
+      primero: 'Hola, soy asesor inmobiliario, ¿trabajan con comisión compartida?',
+      ad: null,
+      info: 'Un colega o un propietario que compara. El asistente NO inventa condiciones: dice que eso lo confirma la asesora, no agenda visita y lo deja fuera del embudo de clientes.',
+      nota: 'Demo: simulas a un colega o propietario que solo pregunta. Datos ficticios.',
+      rapidos: [
+        'Soy propietario, quería ver a cuánto alquilan por San Miguel',
+        '¿Me pueden pasar el precio de sus propiedades?',
+        'Gracias, lo converso con ella',
+        'Más adelante les escribo'
+      ]
+    },
+    curioso: {
+      primero: 'Solo estaba mirando precios',
+      ad: null,
+      info: 'Una persona curiosa, sin intención clara. El asistente no presiona ni inventa urgencia: responde lo justo, deja la puerta abierta y lo califica Frío.',
+      nota: 'Demo: simulas a alguien que solo está mirando. Datos ficticios.',
+      rapidos: [
+        '¿Qué propiedades tienen?',
+        'Todavía no sé si alquilar o comprar',
+        'Gracias, lo pienso',
+        'Más adelante te escribo'
+      ]
+    }
+  };
+  var ORDEN = ['anuncio','distritos','requisitos','comprar','colega','curioso'];
+
+  /* ---------------- utilidades ---------------- */
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  /* Jamas wa_/ig_/msg_/fb_ ni eval_/smoke: el prefijo es propio de la demo */
+  function nuevaSesion(){ return 'greenhousedemo_' + Math.random().toString(16).slice(2,10) + Date.now().toString(36).slice(-4); }
+
+  function hora(v){
+    var d = (v instanceof Date) ? v : (v ? new Date(v) : new Date());
+    if(isNaN(d)) d = new Date();
+    var s;
+    try{
+      s = new Intl.DateTimeFormat('es-PE',{timeZone:TZ,hour:'numeric',minute:'2-digit',hour12:true}).format(d);
+    }catch(e){
+      var h=d.getHours(), m=('0'+d.getMinutes()).slice(-2), t=h<12?'a':'p';
+      h = h%12; if(h===0) h=12;
+      s = h+':'+m+' '+t+'. m.';
+    }
+    return s.replace(/[  ]/g,' ').replace(/\s*\b([APap])\.?\s*[Mm]\.?/, function(_,l){
+      return ' ' + l.toLowerCase() + '. m.';
+    });
+  }
+  function diaLargo(d){
+    try{ return new Intl.DateTimeFormat('es-PE',{timeZone:TZ,weekday:'long',day:'numeric',month:'long'}).format(d); }
+    catch(e){ return 'hoy'; }
+  }
+  function diaManana(){
+    var d = new Date(Date.now() + 24*3600*1000);
+    try{ return new Intl.DateTimeFormat('es-PE',{timeZone:TZ,weekday:'long',day:'numeric',month:'long'}).format(d); }
+    catch(e){ return 'mañana'; }
+  }
+  function norm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+
+  /* reloj de ambientacion (escenario "1:00 a. m."): 1:07 + minutos reales transcurridos */
+  function relojSim(t0){
+    var min = 67 + Math.floor((Date.now() - (t0 || Date.now())) / 60000);
+    var h = Math.floor(min / 60) % 24, m = min % 60;
+    var suf = h < 12 ? 'a. m.' : 'p. m.';
+    var h12 = h % 12; if(h12 === 0) h12 = 12;
+    return h12 + ':' + ('0' + m).slice(-2) + ' ' + suf;
+  }
+  function etiquetaHora(){
+    return (st.esc === 'madrugada') ? relojSim(st.t0) : hora(new Date());
+  }
+
+  /* ---------------- estado (sessionStorage, con respaldo en memoria) ---------------- */
+  function lee(){ try{ return JSON.parse(sessionStorage.getItem(K) || 'null'); }catch(e){ return null; } }
+  function guarda(){
+    try{
+      sessionStorage.setItem(K, JSON.stringify({ esc:st.esc, sesion:st.sesion, msgs:st.msgs.slice(-80), mock:st.mock, mockOn:MOCK, t0:st.t0 }));
+    }catch(e){}
+  }
+  var prev = lee();
+  var st = {
+    esc: (prev && ESCENARIOS[prev.esc]) ? prev.esc : 'anuncio',
+    sesion: '', msgs: [], mock: { paso:'inicio', datos:{}, fallos:0 }, t0: Date.now(),
+    enVuelo:false, esperando:false, lleno:false
+  };
+  /* si cambia ?mock=1 entre cargas, no se mezclan hilos reales con guion local */
+  if(prev && prev.sesion && Array.isArray(prev.msgs) && !!prev.mockOn === MOCK){
+    st.sesion = prev.sesion; st.msgs = prev.msgs; if(prev.mock) st.mock = prev.mock; if(prev.t0) st.t0 = prev.t0;
+  }else{
+    st.sesion = nuevaSesion();
+  }
+
+  /* ---------------- red ---------------- */
+  function post(url, body, ms){
+    var ctl = ('AbortController' in window) ? new AbortController() : null;
+    var to = setTimeout(function(){ if(ctl) ctl.abort(); }, ms||TIMEOUT);
+    return fetch(url,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body), signal:ctl?ctl.signal:undefined, cache:'no-store'
+    }).then(function(r){
+      clearTimeout(to);
+      return r.text().then(function(t){
+        var j=null; try{ j=t?JSON.parse(t):null; }catch(e){}
+        if(!r.ok){ var err=new Error('HTTP '+r.status); err.status=r.status; err.cuerpo=j||t; throw err; }
+        return j||{};
+      });
+    }, function(e){ clearTimeout(to); throw e; });
+  }
+  /* Un reintento solo ante fallos transitorios (red, 5xx). Un 4xx no se reintenta. */
+  function postConReintento(url, body, intento){
+    intento = intento || 0;
+    return post(url, body).catch(function(e){
+      var transitorio = !e.status || e.status >= 500;
+      if(transitorio && intento < REINTENTOS) return postConReintento(url, body, intento+1);
+      throw e;
+    });
+  }
+
+  /* ---------------- formato del texto (estilo WhatsApp) ----------------
+     Se escapa SIEMPRE primero (XSS) y recien despues se reponen negritas,
+     cursivas, tachado, vinetas y enlaces. */
+  function enLinea(l){
+    var h = esc(l);
+    h = h.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+    h = h.replace(/(^|[^\w*])\*([^*\n]+)\*(?![\w*])/g, '$1<strong>$2</strong>');
+    h = h.replace(/(^|[^\w_])_([^_\n]+)_(?![\w_])/g, '$1<em>$2</em>');
+    h = h.replace(/(^|[^\w~])~([^~\n]+)~(?![\w~])/g, '$1<s>$2</s>');
+    return h;
+  }
+  function fmt(texto){
+    var s = String(texto==null?'':texto).replace(/\r\n?/g,'\n');
+    s = s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, '$1: $2');   /* [txt](url) -> txt: url */
+    return s.split('\n').map(function(l){
+      if(!l.trim()) return '<span class="ln sep"></span>';
+      var m = /^\s*[-•*]\s+(.*)$/.exec(l);
+      if(m) return '<span class="ln li">• ' + enLinea(m[1]) + '</span>';
+      var n = /^\s*(\d{1,2})[.)]\s+(.*)$/.exec(l);
+      if(n) return '<span class="ln li">' + esc(n[1]) + '. ' + enLinea(n[2]) + '</span>';
+      return '<span class="ln">' + enLinea(l) + '</span>';
+    }).join('');
+  }
+
+  /* Enlaces clicables por DOM: `a.href` por propiedad y el texto por textContent;
+     la regex exige http(s): nada de `javascript:` ni `data:`. */
+  var RE_URL = /https?:\/\/[^\s<>"']+/g;
+  var CIERRES = '.,;:!?)]}»"\'';
+  function enlaza(root){
+    var textos = [], w, n;
+    try{ w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false); }catch(e){ return; }
+    while((n = w.nextNode())) if(n.nodeValue && n.nodeValue.indexOf('http') >= 0) textos.push(n);
+    textos.forEach(function(nodo){
+      var t = nodo.nodeValue, frag = document.createDocumentFragment(), i = 0, m, hubo = false;
+      RE_URL.lastIndex = 0;
+      while((m = RE_URL.exec(t)) !== null){
+        var url = m[0], cola = '';
+        while(url.length && CIERRES.indexOf(url.charAt(url.length-1)) >= 0){
+          cola = url.charAt(url.length-1) + cola;
+          url = url.slice(0,-1);
+        }
+        if(!url) continue;
+        if(m.index > i) frag.appendChild(document.createTextNode(t.slice(i, m.index)));
+        var a = document.createElement('a');
+        a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = url;
+        frag.appendChild(a);
+        i = m.index + m[0].length - cola.length;
+        hubo = true;
+      }
+      if(!hubo) return;
+      if(i < t.length) frag.appendChild(document.createTextNode(t.slice(i)));
+      nodo.parentNode.replaceChild(frag, nodo);
+    });
+  }
+
+  /* ---------------- alerta al equipo: lectura del texto del agente ----------------
+     Solo se muestra lo que el agente REALMENTE escribio. Se leen las lineas del tipo
+        Etiqueta: valor
+     que formen un bloque de resumen (2 o mas lineas seguidas) o cuya etiqueta sea
+     conocida (nombre, servicio, operacion, zona, presupuesto, personas, telefono, calificacion).
+     Las etiquetas conocidas salen con un nombre uniforme y en un orden fijo; las
+     demas salen con la etiqueta que uso el agente. Si no se puede leer nada, la
+     tarjeta dice que el equipo recibio el chat y ya: no se inventa ningun dato.
+     Acepta viñetas y negritas (- **Nombre:** ...). */
+  var CAMPOS = [
+    { k:'nombre',    o:1,  et:'Nombre',    re:/^(nombre|nombre completo|cliente)$/ },
+    { k:'servicio',  o:2,  et:'Servicio',  re:/^(servicio|motivo|consulta|interes)$/ },
+    { k:'operacion', o:3,  et:'Operación', re:/^(operacion|tipo de operacion|busca)$/ },
+    { k:'zona',      o:4,  et:'Zona',      re:/^(zona|distrito|distrito de interes)$/ },
+    { k:'presup',    o:5,  et:'Presupuesto', re:/^(presupuesto|precio)$/ },
+    { k:'dorm',      o:6,  et:'Dormitorios', re:/^(dormitorios|habitaciones)$/ },
+    { k:'personas',  o:7,  et:'Personas',  re:/^(personas|numero de personas|cantidad de personas)$/ },
+    { k:'mascotas',  o:8,  et:'Mascotas',  re:/^(mascotas|mascota)$/ },
+    { k:'mudanza',   o:9,  et:'Mudanza',   re:/^(mudanza|fecha de mudanza)$/ },
+    { k:'telefono',  o:10, et:'Teléfono',  re:/^(telefono|celular|whatsapp|numero|numero de contacto|numero de celular|numero de whatsapp)$/ },
+    { k:'visita',    o:11, et:'Visita',    re:/^(dia y hora|visita|fecha y hora|horario|franja|disponibilidad|hora)$/ },
+    { k:'calif',     o:12, et:'Calificación', re:/^(calificacion|temperatura|prioridad|nivel de interes|clasificacion|lead)$/ }
+  ];
+  var RE_LINEA = /^\s*(?:[-•*]\s*)?\**\s*([^:\n*]{2,32}?)\s*\**\s*:\s*\**\s*(.+?)\s*$/;
+  var IGNORAR = /^(http|https|nota|importante|ojo|aviso|recuerda|ps|ejemplo|inversion|precio|costo|inicio|fin|horario de clases)$/;
+  function limpiaValor(v){
+    var t = String(v||'').replace(/\*+/g,'').replace(/^[\s"'“”]+|[\s"'“”]+$/g,'').trim();
+    /* quita el punto final de la frase, pero no el de "p. m." / "a. m." */
+    if(/\.$/.test(t) && !/\b[ap]\. ?m\.$/i.test(t)) t = t.replace(/\.+$/,'');
+    return t.trim();
+  }
+  function capitaliza(t){ t = String(t||'').trim(); return t.charAt(0).toUpperCase() + t.slice(1); }
+  /* -> { lista:[{k,et,v,o}], calif:'texto crudo' } */
+  function leeCampos(texto){
+    var items = [];
+    String(texto||'').split('\n').forEach(function(l, i){
+      var m = RE_LINEA.exec(l);
+      if(!m) return;
+      var lab = m[1].trim(), v = limpiaValor(m[2]);
+      if(!v || v.length > 140) return;
+      items.push({ i:i, lab:lab, v:v, n:norm(lab).replace(/[^a-z ]/g,'').trim() });
+    });
+    var lista = [], calif = '';
+    items.forEach(function(it, j){
+      if(IGNORAR.test(it.n)) return;
+      var canon = null;
+      for(var c=0;c<CAMPOS.length;c++){ if(CAMPOS[c].re.test(it.n)){ canon = CAMPOS[c]; break; } }
+      var enRacha = (items[j-1] && items[j-1].i === it.i-1) || (items[j+1] && items[j+1].i === it.i+1);
+      if(canon && canon.k === 'calif'){ if(!calif) calif = it.v; return; }
+      if(!canon && !enRacha) return;
+      var key = canon ? canon.k : ('x_' + it.n);
+      if(lista.some(function(o){ return o.k === key; })) return;
+      lista.push({ k:key, et: canon ? canon.et : capitaliza(it.lab), v:it.v, o: canon ? canon.o : 8 });
+    });
+    lista = lista.map(function(x, idx){ x.idx = idx; return x; })
+                 .sort(function(a,b){ return (a.o - b.o) || (a.idx - b.idx); })
+                 .slice(0, 12);
+    return { lista:lista, calif:calif };
+  }
+  function leeCalif(texto, calCrudo){
+    var re = /\b(caliente|tibi[oa]|fri[oa])\b/;
+    var m = re.exec(norm(calCrudo));
+    if(!m){
+      var t = norm(texto);
+      var m2 = /(?:calific\w*|temperatura|prioridad|clasific\w*|lead|contacto|prospecto|interes)[^.\n]{0,40}?\b(caliente|tibi[oa]|fri[oa])\b/.exec(t) || /\[(caliente|tibi[oa]|fri[oa])\]/.exec(t);
+      m = m2 ? [m2[1], m2[1]] : null;
+    }
+    if(!m) return '';
+    var w = m[1] || m[0];
+    return /^caliente/.test(w) ? 'caliente' : (/^tibi/.test(w) ? 'tibia' : 'fria');
+  }
+  /* El agente avisa al equipo cuando CONFIRMA la llamada. Una oferta ("¿te parece que un
+     asesor te llame?") NO cuenta: se descartan las frases con signo de pregunta o condicionales. */
+  var RE_COMPROMISO = /(te llamar(a|an|e|emos|ia|ian)\b|te escribir(a|an|e|emos|ia|ian)\b|te va a escribir|te van a escribir|te escribiremos|te llamaremos|se comunicara contigo|te contactara|queda(ra)? (agendada|programada|registrada|confirmada)|quedo (agendada|programada|registrada|confirmada)|agende tu llamada|programe tu llamada|registre tu llamada|avise a (un|el|tu) asesor|avise al equipo|alerta (a|para) (el|los|un) (equipo|asesor|vendedor))/;
+  var RE_CONDICIONAL = /^\s*(si |en caso|puedo|podria|podemos|podrian|quieres|deseas|te gustaria|prefieres|cuando quieras)/;
+  function detectaPase(texto){
+    var t = norm(texto);
+    if(/\[\s*(alerta|cierre|handoff|derivado|llamada|pase|contacto|asesor)/.test(t)) return true;
+    if(/(^|\n)\s*(?:[-•*]\s*)?\**\s*calificacion\s*\**\s*:/.test(t)) return true;
+    var frases = t.split(/(?<=[.!\n])/);
+    /* si el mensaje termina pidiendo otro dato, la llamada todavia no se confirma */
+    var ult = (t.trim().split(/(?<=[.!?\n])/).filter(function(x){ return x.trim(); }).pop() || '');
+    if(/[?\u00bf]/.test(ult) && /(nombre|numero|telefono|celular|dia|hora|franja|mes|personas|ds|cita|correo)/.test(ult)) return false;
+    for(var i=0;i<frases.length;i++){
+      var f = frases[i];
+      if(!f || /[?¿]/.test(f)) continue;
+      if(RE_CONDICIONAL.test(f)) continue;
+      if(RE_COMPROMISO.test(f)) return true;
+    }
+    return false;
+  }
+  var RE_MARCA = /\[\s*(?:alerta|cierre|handoff|derivado|llamada|pase|contacto|asesor)[^\]]*\]/ig;
+  function quitaMarcas(texto){ return String(texto||'').replace(RE_MARCA,'').replace(/\n{3,}/g,'\n\n').trim(); }
+
+  function tarjetaPase(){
+    for(var i=st.msgs.length-1;i>=0;i--) if(st.msgs[i].dir === 'pase') return st.msgs[i];
+    return null;
+  }
+  /* Une los campos nuevos a la tarjeta ya mostrada (no se duplica la tarjeta) */
+  function registraPase(replyTexto){
+    var r = leeCampos(replyTexto);
+    var cal = leeCalif(replyTexto, r.calif);
+    var t = tarjetaPase();
+    if(t){
+      var cambio = false;
+      if(!Array.isArray(t.campos)) t.campos = [];
+      r.lista.forEach(function(x){
+        var ya = t.campos.filter(function(y){ return y.k === x.k; })[0];
+        if(!ya){ t.campos.push(x); cambio = true; }
+        else if(ya.v !== x.v){ ya.v = x.v; cambio = true; }
+      });
+      if(cambio) t.campos.sort(function(a,b){ return (a.o - b.o); });
+      if(cal && t.cal !== cal){ t.cal = cal; cambio = true; }
+      return cambio;
+    }
+    st.msgs.push({ id:'pase-'+Date.now(), dir:'pase', campos:r.lista, cal:cal, ts:new Date().toISOString() });
+    return true;
+  }
+
+  /* ---------------- render del hilo ---------------- */
+  var TICKS_LEIDO = '<svg class="ticks" width="16" height="11" viewBox="0 0 16 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-label="Leído"><path d="M1 5.9l2.5 2.6L8.7 3"/><path d="M6.3 8.5L11.5 3"/></svg>';
+  var TICKS_ENVIADO = '<svg class="ticks gris" width="12" height="11" viewBox="0 0 12 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-label="Enviado"><path d="M1 5.9l2.5 2.6L9.5 2.4"/></svg>';
+  var CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  var LUNA = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>';
+  var ETQ_CAL = { caliente:'Caliente', tibia:'Tibio', fria:'Frío' };
+
+  /* Safari/iOS no baja el hilo si el layout aun no se actualizo: rAF de red. */
+  function abajo(){
+    var h = $('hilo');
+    h.scrollTop = h.scrollHeight;
+    if(typeof requestAnimationFrame === 'function'){
+      requestAnimationFrame(function(){ h.scrollTop = h.scrollHeight; });
+    }
+  }
+
+  function htmlAd(tipo){
+    if(tipo === 'depa'){
+      return '<span class="ad css"><span class="big">Alquiler en San Miguel<br><i>V-82 &middot; 3 dormitorios</i></span><span class="rule"></span>'
+        + '<span class="ad-t">Aviso de ejemplo (ilustrativo)<br>Green House Realty</span></span>';
+    }
+    return '';
+  }
+
+  function htmlPase(m){
+    var filas = '';
+    (Array.isArray(m.campos) ? m.campos : []).forEach(function(c){
+      filas += '<dt>' + esc(c.et) + '</dt><dd>' + esc(c.v) + '</dd>';
+    });
+    var cal = m.cal ? '<span class="cal ' + m.cal + '">' + ETQ_CAL[m.cal] + '</span>' : '<span class="cal nd">Sin calificar</span>';
+    return '<div class="pase' + (m._v ? '' : ' nuevo') + '" role="status">'
+      + '<div class="kick"><span class="pulso"></span>Alerta para el equipo de ventas</div>'
+      + '<div class="cab"><span class="ok">' + CHECK + '</span><h4>Visita por confirmar</h4>' + cal + '</div>'
+      + (filas
+          ? '<p class="res">Lo que recibe la asesora</p><dl>' + filas + '</dl>'
+          : '<p class="vacio">La asesora recibe esta conversación completa para atender a la persona.</p>')
+      + (m.tomado
+          ? '<p class="tomado">La asesora tomó el caso. El asistente quedó en pausa.</p>'
+          : '<div class="tomar"><button type="button" data-tomar="1">Atender ahora</button><span>Así lo vería la asesora: toma el caso y el asistente se pausa.</span></div>')
+      + '<a class="crm" href="panel.html">Ver cómo queda en el CRM &rarr;</a>'
+      + '<p class="nota">Simulación: no se avisó a ninguna asesora real.</p>'
+      + '</div>';
+  }
+
+  function pinta(alTope){
+    var h = $('hilo');
+    var esc_ = ESCENARIOS[st.esc];
+    var html = '<span class="demo-nota">' + esc(esc_.nota) + '</span>';
+    if(MOCK) html += '<span class="demo-nota mockn">Modo de prueba local: las respuestas son un guion, no del asistente real.</span>';
+    html += '<span class="dia">' + esc(st.esc === 'madrugada' ? 'Hoy' : diaLargo(new Date())) + '</span>';
+    if(esc_.reloj) html += '<span class="reloj">' + LUNA + esc(esc_.reloj) + ' <small>ambientación de la demo</small></span>';
+
+    st.msgs.forEach(function(m){
+      if(m.dir === 'sis'){
+        html += '<div class="sis' + (m.err ? ' err' : '') + '" role="' + (m.err ? 'alert' : 'status') + '">' + esc(m.texto)
+              + (m.reintentar ? '<button type="button" data-reintentar="' + esc(m.id) + '">Reintentar</button>' : '') + '</div>';
+        return;
+      }
+      if(m.dir === 'pase'){ html += htmlPase(m); m._v = true; return; }
+      var mio = m.dir === 'in';
+      var et = m.tsLabel || hora(m.ts);
+      var nv = m._v ? '' : ' nuevo'; m._v = true;
+      if(m.auto){
+        html += '<div class="msg del-neg meta' + nv + '">' + (m.ad ? htmlAd(m.ad) : '')
+              + '<span class="txt">' + fmt(m.texto) + '</span>'
+              + '<span class="tag-auto">Saludo automático de WhatsApp Business: lo envía Meta, no el asistente.</span>'
+              + '<span class="pie">' + esc(et) + '</span></div>';
+        return;
+      }
+      html += '<div class="msg ' + (mio?'del-cliente':'del-neg') + nv + '">'
+            + '<span class="txt">' + fmt(m.texto) + '</span>'
+            + '<span class="pie">' + esc(et) + (mio?(m.leido?TICKS_LEIDO:TICKS_ENVIADO):'') + '</span>'
+            + '</div>';
+    });
+    if(st.esperando) html += '<div class="typing" aria-label="escribiendo"><i></i><i></i><i></i></div>';
+
+    h.innerHTML = html;
+    var txts = h.querySelectorAll('.msg .txt');
+    for(var i=0;i<txts.length;i++) enlaza(txts[i]);
+    if(alTope){
+      h.scrollTop = 0;
+      if(typeof requestAnimationFrame === 'function') requestAnimationFrame(function(){ h.scrollTop = 0; });
+    }else{
+      abajo();
+    }
+    pintaEstadoPase();
+    pintaTurnos();
+    guarda();
+  }
+
+  function pintaEstadoPase(){
+    var e = $('estado-pase'), t = tarjetaPase();
+    if(t){
+      e.className = 'estado-pase hecho';
+      e.innerHTML = '<b>' + (t.tomado ? 'Un asesor tomó el caso' : 'Alerta enviada al equipo') + '</b>' + (t.cal ? 'Calificación: ' + esc(ETQ_CAL[t.cal]) + '. ' : '') + (t.tomado ? 'El asistente está en pausa.' : 'El asesor recibe la oportunidad y puede escribirle ahora.');
+    }else{
+      e.className = 'estado-pase';
+      e.innerHTML = '<b>Alerta al equipo: pendiente</b>Todavía no hay ninguna oportunidad lista para el asesor.';
+    }
+  }
+  function nTurnos(){ return st.msgs.filter(function(m){ return m.dir === 'in'; }).length; }
+  function pintaTurnos(){
+    var n = nTurnos();
+    $('turnos').textContent = n + ' de ' + MAX_TURNOS;
+  }
+
+  /* ---------------- conversacion ---------------- */
+  function abreHilo(){
+    st.msgs = [];
+    st.mock = { paso:'inicio', datos:{}, fallos:0 };
+    st.t0 = Date.now();
+    st.lleno = false;
+    pinta(true);
+  }
+
+  function precarga(){
+    var t = $('in-msg');
+    t.value = '';
+    ajusta();
+  }
+
+  function nuevaConversacion(foco){
+    st.sesion = nuevaSesion();
+    st.enVuelo = false; st.esperando = false;
+    $('btn-enviar').disabled = false;
+    $('hd-estado').textContent = 'cuenta de empresa';
+    abreHilo();
+    pintaSelector();
+    pintaRapidos();
+    $('in-sesion').value = st.sesion;
+    precarga();
+    if(foco) $('in-msg').focus();
+  }
+
+  function ultimoDelCliente(){
+    for(var i = st.msgs.length - 1; i >= 0; i--) if(st.msgs[i].dir === 'in') return st.msgs[i];
+    return null;
+  }
+
+  /* ---------------- guion local (?mock=1) ----------------
+     Solo para ensayar el diseno y el flujo SIN gastar IA. Cifras: solo las de
+     discovery/BRIEF-ORQUESTADOR.md (USD 120 por persona, antes USD 150; ventana ene-abr 2027). */
+  var VENTA_V82 = 'El V-82 en San Miguel (primer piso, frente a un parque): 140 m², 3 dormitorios con closets, 2 baños, S/ 2,800 al mes más S/ 220 de mantenimiento. Bienvenidas las mascotas. Condiciones: 2 meses de garantía y 1 de adelanto.';
+  var REQ = 'Para alquilar piden: boletas de pago, DNI, antecedentes policiales, penales y judiciales (Certificado Único Laboral adulto) e Infocorp en verde.';
+  var HONESTO = 'Precio y disponibilidad los confirma la asesora antes de la visita.';
+  function mockRespuesta(texto){
+    var m = st.mock, d = m.datos, p = m.paso, t = norm(texto), r = '';
+    var nombre = d.nombre ? d.nombre.split(' ')[0] : '';
+    if(p === 'inicio'){
+      if(st.esc === 'distritos'){
+        d.op = 'Alquiler'; d.zona = 'Pueblo Libre';
+        r = '¡Hola! Soy el asistente virtual (IA) de Green House Realty. Claro, busco opciones de alquiler en Pueblo Libre y también en distritos cercanos que podrían interesarte.\n\n¿Cuál es tu presupuesto mensual?';
+        m.paso = 'presupuesto';
+      }else if(st.esc === 'requisitos'){
+        d.op = 'Alquiler';
+        r = REQ + '\n\n¿En qué zona estás buscando?';
+        m.paso = 'zona';
+      }else if(st.esc === 'comprar'){
+        d.op = 'Compra';
+        r = '¡Hola! Soy el asistente virtual (IA) de Green House Realty. Claro, tenemos casas en venta. Para mostrarte lo que encaja contigo: ¿en qué zona buscas?';
+        m.paso = 'zona';
+      }else if(st.esc === 'colega'){
+        d.frio = true;
+        r = '¡Hola! Soy el asistente virtual (IA) de Green House Realty. Las condiciones de comisión compartida o los precios por zona los confirma directamente la asesora, no los invento yo. ¿Tienes un cliente buscando una propiedad ahora?';
+        m.paso = 'fin';
+      }else if(st.esc === 'curioso'){
+        d.frio = true;
+        r = 'Claro, sin presión. Tenemos propiedades en alquiler y en venta en Lima. ' + HONESTO + '\n\n¿Quieres que te cuente qué tenemos, o prefieres seguir mirando?';
+        m.paso = 'fin';
+      }else{
+        d.op = 'Alquiler'; d.zona = 'San Miguel'; d.presupuesto = 'S/ 2,800';
+        r = '¡Hola! Soy el asistente virtual (IA) de Green House Realty. Sí, está publicado. ' + VENTA_V82 + '\n\n¿Cuántas personas serían?';
+        m.paso = 'personas';
+      }
+    }else if(p === 'zona'){
+      d.zona = texto.replace(/^(busco en|en|prefiero)\s+/i,'').trim();
+      r = '¿Cuál es tu presupuesto?';
+      m.paso = 'presupuesto';
+    }else if(p === 'presupuesto'){
+      d.presupuesto = texto.replace(/^(mi presupuesto es|hasta|presupuesto)\s+/i,'').trim();
+      r = d.op === 'Compra' ? 'Perfecto. Tenemos la casa V-190 en Carabayllo (US$ 135,000, 4 dormitorios) y la V-182 en Comas (US$ 170,000). ' + HONESTO + '\n\n¿Cuántas personas vivirían ahí?' : '¿Cuántas personas serían?';
+      m.paso = 'personas';
+    }else if(p === 'personas'){
+      var n = (texto.match(/\d+/) || [])[0];
+      if(!n && /\b(un|una|solo|sola)\b/.test(t)) n = '1';
+      d.personas = n || '3';
+      if(/gat|perr|mascot/.test(t)) d.mascotas = 'Sí';
+      if(d.op === 'Compra'){ r = '¿Qué día y a qué hora te gustaría visitarla? Te propongo el sábado a las 11:00 a. m. o el lunes a las 4:30 p. m.'; m.paso = 'franja_d'; }
+      else if(d.mascotas){ r = 'Muy bien, el departamento acepta mascotas. ' + REQ + '\n\n¿Qué día y a qué hora te gustaría visitarlo? Te propongo el viernes a las 7:00 p. m. o el sábado a las 11:00 a. m.'; m.paso = 'franja_d'; }
+      else{ r = '¿Tienes mascotas?'; m.paso = 'mascotas'; }
+    }else if(p === 'mascotas'){
+      d.mascotas = /\bno\b/.test(t) && !/\bsi\b/.test(t) ? 'No' : 'Sí';
+      r = 'Gracias. ' + REQ + '\n\n¿Qué día y a qué hora te gustaría visitarlo? Te propongo el viernes a las 7:00 p. m. o el sábado a las 11:00 a. m.';
+      m.paso = 'franja_d';
+    }else if(p === 'franja_d'){
+      d.franja = texto.trim();
+      r = 'Perfecto, lo dejo como preferencia. ¿Cuál es tu nombre completo?';
+      m.paso = 'nombre';
+    }else if(p === 'nombre'){
+      d.nombre = texto.replace(/^(mi nombre es|me llamo|soy)\s+/i,'').trim();
+      nombre = d.nombre.split(' ')[0];
+      r = 'Mucho gusto, ' + nombre + '. ¿A qué número te confirma la asesora? Si es el mismo de este WhatsApp, dímelo.';
+      m.paso = 'telefono';
+    }else if(p === 'telefono'){
+      d.tel = /mismo|este|whatsapp/.test(t) ? 'El mismo de este WhatsApp' : (texto.replace(/[^\d ]/g,'').trim() || texto.trim());
+      r = 'Confirmo tus datos:'
+        + '\n- Servicio: Visita al inmueble'
+        + '\n- Nombre: ' + d.nombre
+        + '\n- Operación: ' + (d.op || 'Por confirmar')
+        + '\n- Zona: ' + (d.zona || 'Por confirmar')
+        + '\n- Presupuesto: ' + (d.presupuesto || 'Por confirmar')
+        + '\n- Personas: ' + (d.personas || '1')
+        + '\n- Mascotas: ' + (d.mascotas || 'Sin dato')
+        + '\n- Teléfono: ' + d.tel
+        + '\n- Día y hora: ' + capitaliza(d.franja)
+        + '\n- Calificación: Caliente'
+        + '\n\nListo, ' + nombre + '. Dejé tu solicitud con la asesora: te atiende en el día y la hora que elegiste. ' + HONESTO;
+      m.paso = 'fin';
+    }else{
+      r = d.frio ? 'Cuando quieras, aquí estoy. Sin apuro.' : 'Tu solicitud ya está con la asesora. Si tienes otra duda mientras tanto, dime. ' + HONESTO;
+    }
+    return r;
+  }
+
+  /* `reenvio`: reintento tras un error; no vuelve a pintar la burbuja del contacto. */
+  function enviar(texto, reenvio){
+    texto = String(texto||'').trim();
+    if(!texto || st.enVuelo) return;
+
+    var sesion = st.sesion;
+    var mio;
+    var tp = tarjetaPase();
+    if(tp && tp.tomado && !reenvio){
+      /* un asesor ya tomo el caso: el asistente esta en pausa, no se llama al chat */
+      st.msgs.push({ id:'local-'+Date.now(), dir:'in', texto:texto, ts:new Date().toISOString(), tsLabel:etiquetaHora(), leido:true });
+      st.msgs.push({ id:'s-'+Date.now(), dir:'sis', texto:'La asesora tomó el caso, así que el asistente está en pausa. En esta simulación no responde nadie más: usa Reiniciar chat para volver a empezar.' });
+      pinta();
+      return;
+    }
+    if(!reenvio && nTurnos() >= MAX_TURNOS){
+      st.lleno = true;
+      var ult = st.msgs[st.msgs.length - 1];
+      if(!(ult && ult.dir === 'sis' && ult.limite)) st.msgs.push({ id:'s-'+Date.now(), dir:'sis', limite:true, texto:'Llegaste al máximo de mensajes de esta conversación de prueba. Usa Reiniciar chat para empezar otra.' });
+      pinta();
+      return;
+    }
+    var primerMensaje = !reenvio && !st.msgs.some(function(m){ return m.dir === 'in'; });
+    if(reenvio){ mio = ultimoDelCliente(); }
+    else{
+      mio = { id:'local-'+Date.now(), dir:'in', texto:texto, ts:new Date().toISOString(), tsLabel:etiquetaHora(), leido:false };
+      st.msgs.push(mio);
+      /* Saludo automatico de WhatsApp Business: aparece tras el primer mensaje, es local */
+      if(primerMensaje){
+        st.msgs.push({ id:'auto-'+Date.now(), dir:'out', auto:true, ad:ESCENARIOS[st.esc].ad, texto:'✨ Gracias por comunicarte con Green House Inmobiliaria. 🏡🌱🌳 ¿Cómo podemos ayudarte?', ts:new Date().toISOString(), tsLabel:etiquetaHora() });
+      }
+    }
+
+    st.enVuelo = true; st.esperando = true;
+    $('btn-enviar').disabled = true;
+    $('hd-estado').textContent = 'escribiendo…';
+    pinta();
+
+    var llamada;
+    if(MOCK){
+      var textoMock = mockRespuesta(texto);
+      llamada = new Promise(function(res){ setTimeout(function(){ res({ output:textoMock }); }, 700 + Math.random()*500); });
+    }else{
+      llamada = postConReintento(EP_CHAT, { message: texto, sessionId: sesion, channel: 'web', origin: location.origin });
+    }
+
+    llamada
+      .then(function(r){ return { r:r }; }, function(e){ return { e:e }; })
+      .then(function(a){
+        if(st.sesion !== sesion) return;
+        if(mio) mio.leido = true;
+        if(a.e){
+          st.msgs.push({ id:'s-'+Date.now(), dir:'sis', err:true, reintentar:true, texto: mensajeError(a.e), reintento:texto });
+          return;
+        }
+        var reply = a.r && (a.r.output || a.r.response || a.r.text);
+        if(reply && String(reply).trim()){
+          reply = String(reply);
+          var visible = quitaMarcas(reply);
+          st.msgs.push({ id:'r-'+Date.now(), dir:'out', texto:visible || reply, ts:new Date().toISOString(), tsLabel:etiquetaHora() });
+          if(detectaPase(reply)) registraPase(reply);
+        }else{
+          st.msgs.push({ id:'s-'+Date.now(), dir:'sis', err:true, reintentar:true, texto:'El asistente respondió vacío.', reintento:texto });
+        }
+      }).then(function(){
+        if(st.sesion !== sesion) return;
+        st.enVuelo = false; st.esperando = false;
+        $('btn-enviar').disabled = false;
+        $('hd-estado').textContent = 'cuenta de empresa';
+        pinta();
+      });
+  }
+
+  function mensajeError(e){
+    if(e && e.status === 404) return 'El asistente todavía no está conectado en este servidor. Reintenta en unos minutos.';
+    if(e && e.status === 413) return 'Tu mensaje es muy largo. Envíalo en partes más cortas.';
+    if(e && e.status === 429) return 'Demasiados mensajes seguidos. Espera un momento y reintenta.';
+    if(e && e.name === 'AbortError') return 'El asistente tardó más de lo normal en responder.';
+    if(e && e.status) return 'El asistente no pudo responder (error ' + e.status + ').';
+    return 'No hay conexión con el asistente.';
+  }
+
+  /* ---------------- interfaz ---------------- */
+  function ajusta(){
+    var t = $('in-msg'); t.style.height = 'auto';
+    t.style.height = Math.min(t.scrollHeight, 100) + 'px';
+    t.style.overflowY = t.scrollHeight > 100 ? 'auto' : 'hidden';
+  }
+  function pintaSelector(){
+    var btns = document.querySelectorAll('.chip[data-esc]');
+    for(var i=0;i<btns.length;i++) btns[i].setAttribute('aria-pressed', btns[i].getAttribute('data-esc') === st.esc ? 'true' : 'false');
+    $('sel-info').textContent = ESCENARIOS[st.esc].info;
+    $('st-hora').textContent = etiquetaHora();
+  }
+  function pintaRapidos(){
+    ['rapidos-d','rapidos-m'].forEach(function(cont){
+      var caja = $(cont); if(!caja) return;
+      caja.innerHTML = '';
+      ESCENARIOS[st.esc].rapidos.forEach(function(txt){
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'rapido'; b.textContent = txt;
+        b.addEventListener('click', function(){ $('in-msg').value = txt; $('in-msg').focus(); ajusta(); });
+        caja.appendChild(b);
+      });
+    });
+  }
+  /* El boton de escenario empieza una conversacion nueva y envia el primer mensaje literal.
+     Antirrebote: un doble toque no gasta dos turnos reales. */
+  var ultimoChip = 0;
+  function iniciaEscenario(e){
+    var ahora = Date.now();
+    if(ahora - ultimoChip < 1500) return;
+    ultimoChip = ahora;
+    st.esc = e;
+    nuevaConversacion(false);
+    enviar(ESCENARIOS[e].primero);
+  }
+
+  function init(){
+    if(!st.msgs.length) abreHilo(); else pinta(false);
+    $('in-sesion').value = st.sesion;
+    pintaSelector();
+    pintaRapidos();
+
+    var chips = document.querySelectorAll('.chip[data-esc]');
+    for(var i=0;i<chips.length;i++){
+      (function(b){ b.addEventListener('click', function(){ iniciaEscenario(b.getAttribute('data-esc')); }); })(chips[i]);
+    }
+
+    $('hilo').addEventListener('click', function(ev){
+      var tm = ev.target.closest && ev.target.closest('button[data-tomar]');
+      if(tm){
+        var t = tarjetaPase();
+        if(t && !t.tomado){ t.tomado = true; pinta(); }
+        return;
+      }
+      var r = ev.target.closest && ev.target.closest('button[data-reintentar]');
+      if(r && !st.enVuelo){
+        var id = r.getAttribute('data-reintentar'), texto = '';
+        st.msgs = st.msgs.filter(function(m){ if(m.id === id){ texto = m.reintento || ''; return false; } return true; });
+        enviar(texto, true);
+      }
+    });
+
+    $('form').addEventListener('submit', function(ev){
+      ev.preventDefault();
+      var t = $('in-msg').value;
+      $('in-msg').value = ''; ajusta();
+      enviar(t);
+    });
+    $('in-msg').addEventListener('input', ajusta);
+    $('in-msg').addEventListener('keydown', function(ev){
+      if(ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); $('form').requestSubmit(); }
+    });
+    $('btn-reiniciar').addEventListener('click', function(){ nuevaConversacion(true); });
+    $('btn-reiniciar-top').addEventListener('click', function(){ nuevaConversacion(true); });
+
+    var av = $('hd-av');
+    av.addEventListener('error', function(){ av.style.visibility = 'hidden'; });
+    if(av.complete && av.naturalWidth === 0) av.style.visibility = 'hidden';
+
+    /* el reloj de la barra de estado solo existe en escritorio */
+    var reloj = function(){ $('st-hora').textContent = etiquetaHora(); };
+    reloj();
+    var timer = setInterval(reloj, 20000);
+    window.addEventListener('pagehide', function(){ clearInterval(timer); });
+  }
+
+  /* solo en local: permite probar el lector de la alerta sin gastar turnos del chat */
+  if(esLocal) window.__greenhouseParse = { leeCampos:leeCampos, leeCalif:leeCalif, detectaPase:detectaPase };
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+</body>
+</html>
